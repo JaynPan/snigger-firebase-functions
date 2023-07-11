@@ -1,10 +1,11 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
-
+const UUID = require("uuid-v4");
 const express = require('express');
 const cors = require('cors');
-const multer = require('multer');
 const serviceAccount = require("./serviceAccountKey.json");
+const formidable = require("formidable-serverless");
+const dayjs = require('dayjs');
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
@@ -13,7 +14,8 @@ admin.initializeApp({
 const app = express();
 const db = admin.firestore();
 const storage = admin.storage();
-const upload = multer({ storage: multer.memoryStorage() })
+const bucketName = 'giggle-ff996.appspot.com';
+const bucket = storage.bucket(bucketName);
 
 app.use(cors({ origin: true }));
 
@@ -21,35 +23,44 @@ app.get('/', (req, res) => {
   return res.status(200).send('Healthy!');
 })
 
-app.post("/api/meme", upload.single("file"), async (req, res) => {
-  try {
-    // save image to storage
-    const myBucket = storage.bucket('giggle-ff996.appspot.com');
-    const file = myBucket.file('test.png');
+function generateImageExpirationDate() {
+  const futureDate = dayjs().add(2, 'day');
+  const formattedDate = futureDate.format('MM-DD-YYYY');
 
-    file.save(req.file, async (err) => {
-      if (err) {
+  return formattedDate;
+}
+
+app.post("/api/meme", async (req, res) => {
+  try {
+    const form = new formidable.IncomingForm({ multiples: true });
+    
+    form.parse(req, async (err, fields, files) => {
+      if(err) {
         return res.status(400).send('something went wrong');
       }
 
-      // save metadata
-      const result = await db.collection("photos").doc().create({
-        id: Date.now(),
-        name: req.body.name
+      const uuid = UUID();
+      const bucket = storage.bucket('gs://giggle-ff996.appspot.com');
+      const { path, type, name } = files.photo;
+      const splitName = name.split('.');
+      const fileExtension = splitName[splitName.length - 1];
+      const filename = `${uuid}.${fileExtension}`;
+      const destination = `cats/${filename}`;
+
+      await bucket.upload(path, {
+        destination,
+        metadata: {
+          contentType: type,
+        }
       });
 
-      functions.logger.log(result)
+      await db.collection("photos").doc().create({
+        id: Date.now(),
+        name: destination,
+      });
+
       return res.status(200).send('ok')
-    });
-
-    // // save metadata
-    // const result = await db.collection("photos").doc().create({
-    //   id: Date.now(),
-    //   name: req.body.name
-    // });
-
-    // functions.logger.log(result)
-    // return res.status(200).send('ok')
+    })
   } catch(err) {
     functions.logger.error(err)
     return res.status(400).send('something went wrong');
@@ -74,20 +85,22 @@ app.get('/api/randomMeme', async (req, res) => {
     const snapshot = await collection.get();
     const randomIndex = Math.floor(Math.random() * snapshot.size);
     const randomDocument = snapshot.docs[randomIndex].data();
+    const filePath = randomDocument.name;
+    const file = bucket.file(filePath);
+    const signedURLconfig = { action: 'read', expires: generateImageExpirationDate() };
+    const signedURLArray = await file.getSignedUrl(signedURLconfig);
+    const url = signedURLArray[0];
 
-    return res.status(200).json(randomDocument);
+    return res.status(200).json({ url });
   } catch(err) {
     return res.status(400).send('something went wrong');
   }
 })
 
-app.get('/api/photos/:id', async (req, res) => {
+app.get('/api/photos', async (req, res) => {
   try {
-    const bucket = storage.bucket("giggle-ff996.appspot.com");
-    const file = bucket.file("foo.png");
-
-    const signedURLconfig = { action: 'read', expires: '01-01-2030' };
-
+    const file = bucket.file(req.query.filePath);
+    const signedURLconfig = { action: 'read', expires: generateImageExpirationDate() };
     const signedURLArray = await file.getSignedUrl(signedURLconfig);
     const url = signedURLArray[0];
 
