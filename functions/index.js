@@ -6,6 +6,7 @@ const cors = require('cors');
 const serviceAccount = require("./serviceAccountKey.json");
 const formidable = require("formidable-serverless");
 const dayjs = require('dayjs');
+const sharp = require('sharp');
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
@@ -46,8 +47,24 @@ app.post("/api/meme", async (req, res) => {
       const fileExtension = splitName[splitName.length - 1];
       const filename = `${uuid}.${fileExtension}`;
       const destination = `cats/${filename}`;
+      let resizedImage = null;
+      
+      // resize and compress image
+      if(fileExtension.toLowerCase() === 'png') {
+        resizedImage = await sharp(path)
+        .resize(720)
+        .png({ quality: 30 })
+        .toBuffer()
+      } else {
+        resizedImage = await sharp(path)
+        .resize(720)
+        .jpeg({ quality: 30 })
+        .toBuffer()
+      }
 
-      await bucket.upload(path, {
+      const file = bucket.file(destination)
+
+      await file.save(resizedImage, {
         destination,
         metadata: {
           contentType: type,
@@ -91,7 +108,7 @@ app.get('/api/randomMeme', async (req, res) => {
     const signedURLArray = await file.getSignedUrl(signedURLconfig);
     const url = signedURLArray[0];
 
-    return res.status(200).json({ url });
+    return res.status(200).json({ url, id: filePath });
   } catch(err) {
     return res.status(400).send('something went wrong');
   }
@@ -104,7 +121,7 @@ app.get('/api/photos', async (req, res) => {
     const signedURLArray = await file.getSignedUrl(signedURLconfig);
     const url = signedURLArray[0];
 
-    return res.status(200).send(url);
+    return res.status(200).json({ url });
   } catch(err) {  
     return res.status(400).send('something went wrong');
   }

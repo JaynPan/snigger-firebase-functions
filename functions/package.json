@@ -10,7 +10,7 @@
     "logs": "firebase functions:log"
   },
   "engines": {
-    "node": "10"
+    "node": "16"
   },
   "main": "index.js",
   "dependencies": {
@@ -22,6 +22,7 @@
     "firebase-functions": "^3.6.1",
     "formidable": "^3.5.0",
     "formidable-serverless": "^1.1.1",
+    "sharp": "^0.32.3",
     "uuid-v4": "^0.1.0"
   },
   "devDependencies": {
