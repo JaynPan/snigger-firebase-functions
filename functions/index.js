@@ -21,7 +21,7 @@ const bucket = storage.bucket(bucketName);
 app.use(cors({ origin: true }));
 
 app.get('/', (req, res) => {
-  return res.status(200).send('Healthy!');
+  return res.status(200).json({message:'Healthy!'});
 })
 
 function generateImageExpirationDate() {
@@ -37,7 +37,7 @@ app.post("/api/meme", async (req, res) => {
     
     form.parse(req, async (err, fields, files) => {
       if(err) {
-        return res.status(400).send('something went wrong');
+        return res.status(400).json({message: 'something went wrong'});
       }
 
       const uuid = UUID();
@@ -76,11 +76,11 @@ app.post("/api/meme", async (req, res) => {
         name: destination,
       });
 
-      return res.status(200).send('ok')
+      return res.status(200).json({message: 'ok'})
     })
   } catch(err) {
     functions.logger.error(err)
-    return res.status(400).send('something went wrong');
+    return res.status(400).json({message: 'something went wrong'});
   }
 })
 
@@ -92,7 +92,7 @@ app.get('/api/meme/:id', async (req, res) => {
 
     return res.status(200).json(photoMetadata);
   } catch(err) {
-    return res.status(400).send('something went wrong');
+    return res.status(400).json({message: 'something went wrong'});
   }
 })
 
@@ -110,7 +110,7 @@ app.get('/api/randomMeme', async (req, res) => {
 
     return res.status(200).json({ url, id: filePath });
   } catch(err) {
-    return res.status(400).send('something went wrong');
+    return res.status(400).json({message: 'something went wrong'});
   }
 })
 
@@ -123,8 +123,38 @@ app.get('/api/photos', async (req, res) => {
 
     return res.status(200).json({ url });
   } catch(err) {  
-    return res.status(400).send('something went wrong');
+    return res.status(400).json({message: 'something went wrong'});
   }
 })
+
+app.get('/api/memeList', async (req, res) => {
+  try {
+    const collection = db.collection('photos');
+    const snapshot = await collection.get();
+    const promises = [];
+
+    snapshot.forEach((document) => {
+        const filePath = document.data().name;
+        const file = bucket.file(filePath);
+        
+        promises.push({ file, filePath, documentId: document.id });
+    });
+    const result = await Promise.all(promises.map(async({ file, filePath, documentId }) => {
+      try {
+        const signedURLArray = await file.getSignedUrl({ action: 'read', expires: generateImageExpirationDate() });
+        const url = signedURLArray[0];
+
+        return { url, filePath, documentId };
+      } catch(err) {
+        functions.logger.error(err)
+        throw new Error('wrong');
+      }
+    }));
+    
+    return res.status(200).json(result);
+  } catch (err) {
+    return res.status(400).json({ message: 'Something went wrong' });
+  }
+});
 
 exports.app = functions.https.onRequest(app);
