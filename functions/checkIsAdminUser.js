@@ -1,4 +1,5 @@
 const admin = require('./adminConfig');
+const {ADMIN_USER_UID} = require('./constants.json');
 
 async function checkIsAdminUser(req) {
   if ((!req.headers.authorization || !req.headers.authorization.startsWith('Bearer '))) {
@@ -15,9 +16,8 @@ async function checkIsAdminUser(req) {
 
   try {
     const decodedIdToken = await admin.auth().verifyIdToken(idToken);
-    const adminUserUid = 'Trzwveh45PYK2N82WnDMDdgd3Dj1';
 
-    if(decodedIdToken.uid !== adminUserUid) return false;
+    if(decodedIdToken.uid !== ADMIN_USER_UID) return false;
 
     req.user = decodedIdToken;
     return true;

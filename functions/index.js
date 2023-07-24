@@ -8,12 +8,12 @@ const sharp = require('sharp');
 const admin = require('./adminConfig');
 const checkIsAdminUser = require('./checkIsAdminUser');
 const generateImageExpirationDate = require('./generateImageExpirationDate');
+const {BUCKET_NAME} = require('./constants.json')
 
 const app = express();
 const db = admin.firestore();
 const storage = admin.storage();
-const bucketName = 'giggle-ff996.appspot.com';
-const bucket = storage.bucket(bucketName);
+const bucket = storage.bucket(BUCKET_NAME);
 
 app.use(cors({ origin: true }));
 
@@ -37,7 +37,6 @@ app.post("/api/meme", async (req, res) => {
       }
 
       const uuid = UUID();
-      const bucket = storage.bucket('gs://giggle-ff996.appspot.com');
       const { path, type, name } = files.photo;
       const splitName = name.split('.');
       const fileExtension = splitName[splitName.length - 1];
