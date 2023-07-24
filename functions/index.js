@@ -68,7 +68,7 @@ app.post("/api/meme", async (req, res) => {
       });
 
       await db.collection("photos").doc().create({
-        id: Date.now(),
+        createdAt: Date.now(),
         name: destination,
       });
 
@@ -156,7 +156,7 @@ app.get('/api/memeList', async (req, res) => {
 
   try {
     const collection = db.collection('photos');
-    const snapshot = await collection.get();
+    const snapshot = await collection.orderBy('createdAt', 'desc').get();
     const promises = [];
 
     snapshot.forEach((document) => {
