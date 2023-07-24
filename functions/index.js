@@ -1,16 +1,13 @@
 const functions = require('firebase-functions');
-const admin = require('firebase-admin');
 const UUID = require("uuid-v4");
 const express = require('express');
 const cors = require('cors');
-const serviceAccount = require("./serviceAccountKey.json");
 const formidable = require("formidable-serverless");
-const dayjs = require('dayjs');
 const sharp = require('sharp');
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-});
+const admin = require('./adminConfig');
+const checkIsAdminUser = require('./checkIsAdminUser');
+const generateImageExpirationDate = require('./generateImageExpirationDate');
 
 const app = express();
 const db = admin.firestore();
@@ -24,14 +21,13 @@ app.get('/', (req, res) => {
   return res.status(200).json({message:'Healthy!'});
 })
 
-function generateImageExpirationDate() {
-  const futureDate = dayjs().add(2, 'day');
-  const formattedDate = futureDate.format('MM-DD-YYYY');
-
-  return formattedDate;
-}
-
 app.post("/api/meme", async (req, res) => {
+  const isAdmin = await checkIsAdminUser(req);
+
+  if (!isAdmin) {
+    return res.status(403).send('Unauthorized');
+  }
+
   try {
     const form = new formidable.IncomingForm({ multiples: true });
     
@@ -97,6 +93,12 @@ app.get('/api/meme/:id', async (req, res) => {
 })
 
 app.delete('/api/meme', async (req, res) => {
+  const isAdmin = await checkIsAdminUser(req);
+
+  if (!isAdmin) {
+    return res.status(403).send('Unauthorized');
+  }
+
   const { documentId, filePath } = req.query;
 
   if(!documentId || !filePath) return res.status(400).json({ message: 'params error' });
@@ -146,6 +148,12 @@ app.get('/api/photos', async (req, res) => {
 })
 
 app.get('/api/memeList', async (req, res) => {
+  const isAdmin = await checkIsAdminUser(req);
+
+  if (!isAdmin) {
+    return res.status(403).send('Unauthorized');
+  }
+
   try {
     const collection = db.collection('photos');
     const snapshot = await collection.get();
