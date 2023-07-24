@@ -96,6 +96,24 @@ app.get('/api/meme/:id', async (req, res) => {
   }
 })
 
+app.delete('/api/meme', async (req, res) => {
+  const { documentId, filePath } = req.query;
+
+  if(!documentId || !filePath) return res.status(400).json({ message: 'params error' });
+
+  try {
+    const reqDoc = db.collection('photos').doc(documentId);
+    const file = bucket.file(filePath);
+
+    await reqDoc.delete();
+    await file.delete();
+    return res.status(200).json({ documentId });
+  } catch(err) {
+    functions.logger.error(err);
+    return res.status(400).json({ message: 'something went wrong' });
+  }
+})
+
 app.get('/api/randomMeme', async (req, res) => {
   try {
     const collection = db.collection('photos');
